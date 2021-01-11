@@ -2,68 +2,111 @@
 class CreateAndStoreUserDetail {
     public $csvData = array();
     public $data;
+    public $count;
+    public $errorLog;
+    //public $invalidEmailCount;
     public function getOption()
     {
         $shortopts  = "";
         $shortopts .= "u:";  
         $shortopts .= "p:"; 
         $shortopts .= "h:";
-
+        $this->count = 0;
+        $this->errorLog = " ";
         $longopts  = array(
             "file:",    
             "create_table::",   
-            "dry_run::"
+            "dry_run::",
+            "help::"
         );
         $options = getopt($shortopts, $longopts);
         var_dump($options);
-        if(array_key_exists("create_table",$options))
+        if(array_key_exists("file",$options) && array_key_exists("dry_run",$options) )
         {
-            $db = $this->databaseConnectivity($options["u"],$options["p"], $options["h"]);
-            if(!$db) 
+            if(isset($options["file"]))
             {
-                echo "Error : Unable to open database\n";
-            } 
-            else 
-            {
-                $result=$this->createTable($db);
-                if($result)
-                {
-                    echo "Table created successfully";
-                }
-                else
-                {
-                    echo pg_last_error($db);
-                }
-                pg_close($db);
+                $csvData=$this->readCSV($options["file"]);
+                echo "dry run completed";
             }
-        } 
-        if(array_key_exists("file",$options))
-        {
-            $csvData=$this->readCSV($options["file"]);
-            $db = $this->databaseConnectivity($options["u"],$options["p"], $options["h"]);
-            if($db) 
+            else
             {
-                $result = $this->createTable($db);
-                if($result)
+                echo "File Name is not provided";
+            }
+        }
+        elseif(array_key_exists("create_table",$options))
+        {
+            if(isset($options["u"]) && isset($options["p"]) && isset($options["h"]))
+            {
+                $db = $this->databaseConnectivity($options["u"],$options["p"], $options["h"]);
+                if(!$db) 
                 {
-                    for($c=0; $c<count($csvData);$c++)
+                    echo "Error : Unable to open database\n";
+                } 
+                else 
+                {
+                    $result=$this->createTable($db);
+                    if($result)
                     {
-                        $data = $csvData[$c];
-                        echo($data["email"]);
-                        if(filter_var($data["email"], FILTER_VALIDATE_EMAIL))
-                        {
-                            $this->insertData($db,$data);
-                        }
-                        else
-                        {
-                            echo ("invalid email");
-                        }
+                        echo "Table created successfully";
                     }
+                    else
+                    {
+                        echo pg_last_error($db);
+                    }
+                    pg_close($db);
+                }
+            }
+            else{
+                echo "Hostname, username, and password is not provided";
+            }   
+        } 
+        elseif(array_key_exists("file",$options))
+        {
+            if(isset($options["file"]))
+            {
+                $csvData=$this->readCSV($options["file"]);
+            }
+            else
+            {
+                echo "File name is not provided";
+            }
+            
+            if(isset($options["u"]) && isset($options["p"]) && isset($options["h"]))
+            {
+                $db = $this->databaseConnectivity($options["u"],$options["p"], $options["h"]);
+                if($db) 
+                {
+                    $result = $this->createTable($db);
+                    if($result)
+                    {
+                        for($c=0; $c<count($csvData);$c++)
+                        {
+                            $data = $csvData[$c];
+                            if(filter_var($data["email"], FILTER_VALIDATE_EMAIL))
+                            {
+                                $this->insertData($db,$data,count($csvData));
+                            }
+                            else
+                            {
+                                $this->errorLog = $this->errorLog. $data["name"] . " " . $data["surname"]. " ". $data["email"] . " invalid email\n" ;
+                            }
+                        }
+                        echo $this->count. " Out of " . count($csvData) . " Processed Successfully\n";
+                        echo "Error log: \n" .   $this->errorLog;
                     pg_close($db);           
-                }   
+                    }   
+                }
             } 
+            else
+            {
+                echo "Hostname, username, and password is not provided";
+            }
                
-        }      
+        }   
+        /*elseif(array_key_exists("help",$options))
+        {
+
+        }*/   
     }
 
     public function readCSV($filename)
@@ -78,14 +121,10 @@ class CreateAndStoreUserDetail {
                     if(!$header)
                         $header = array_map('trim', $row);
                     else
-                        //$b = array_map('trim', $header);
-                        //echo("header trim");
-                        //print_r($b);
                         $csvData[] = array_combine($header, $row);
-                        print_r($csvData);
                 }
                 fclose($handle);
-                return $csvData;     
+                return TRUE;     
         }
     }
 
@@ -109,7 +148,7 @@ class CreateAndStoreUserDetail {
         //pg_close($db);
         return $ret;    
     }
-    public function insertData($db, $data)
+    public function insertData($db, $data, $totalRecords)
     {
         $name = ucwords(strtolower(pg_escape_string($data["name"])));
         $surname = ucwords(strtolower(pg_escape_string($data["surname"])));
@@ -119,18 +158,21 @@ class CreateAndStoreUserDetail {
         $rows = pg_num_rows($result);
         if($rows==0) 
         {
-            $sqlInsertQuery ="INSERT INTO USERS(name,surname,email)
-                          VALUES ('$name', '$surname','$email');";
+            $sqlInsertQuery = "INSERT INTO USERS(name,surname,email)
+                               VALUES ('$name', '$surname','$email');";
             $returnVal = pg_query($db, $sqlInsertQuery);
             if(!$returnVal) 
             {
-                echo pg_last_error($db);
+                $this->errorLog = $this->errorLog.pg_last_error($db)."\n";    
             } 
             else 
             {
-                echo "Records created successfully\n";
-            }
-           
+                $this->count = $this->count + pg_affected_rows($returnVal);
+            } 
+        }
+        else
+        {
+            $this->errorLog = $this->errorLog. $name . " " . $surname . " " . $email . " User exists" .  "\n";
         }
     }
 }

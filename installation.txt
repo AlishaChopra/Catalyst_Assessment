@@ -1,0 +1,34 @@
+
+//Ubuntu settings to run script
+
+sudo apt-get install php7.4-cli
+sudo apt-get install php7.4-pgsql
+
+cd path for the folder consisting of script and users.csv
+php scriptname.php --file "user_upload.php" --dry_run
+php scriptname.php --create_table -u "username value" -h "host value" -p "password value"   // to create table
+php scriptname.php --file "users.csv" -u "username value" -h "host value" -p "password value"   // to insert values to table
+
+
+//Windows settings to run script
+Please install xampp and add the xampp/php path to environment variable
+In xampp control panel configure php.ini in Apache server option
+uncomment lines 
+extension=pdo_pgsql
+extension=pdo_sqlite
+In Xampp control panel start Apache server 
+
+Install postgresql 13
+Please add postgresql bin and lib path to environment variable
+PgAdmin could be used to view table 
+
+through command prompt 
+cd path for the folder consisting of script and users.csv
+php scriptname.php --file "user_upload.php" --dry_run
+php scriptname.php --create_table -u "username value" -h "host value" -p "password value"   // to create table
+php scriptname.php --file "users.csv" -u "username value" -h "host value" -p "password value"   // to insert values to table
+
+I have used postgres db as dbname
+
+
+
